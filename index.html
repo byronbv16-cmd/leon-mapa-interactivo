@@ -2,33 +2,43 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>León Ciudad Educadora - Visor Satelital</title>
   
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- Search Header Flotante -->
+  <!-- Barra superior unificada (Botón menú + Buscador + Limpiar) -->
   <div class="search-bar-container">
     <div class="search-input-wrapper">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="global-search" placeholder="Buscar en León Ciudad Educadora...">
+      <button id="toggle-sidebar-btn" class="icon-btn" title="Mostrar/Ocultar lista">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <input type="text" id="global-search" placeholder="Buscar trámite o lugar en León...">
+      <button id="clear-search-btn" class="icon-btn hidden" title="Limpiar búsqueda">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
   </div>
 
+  <!-- Fondo oscuro para cerrar menús en móvil -->
+  <div class="mobile-backdrop" id="mobile-backdrop"></div>
+
   <!-- Contenedor Principal -->
   <div class="main-container">
-    <!-- Sidebar Izquierdo -->
+    <!-- Sidebar Izquierdo Colapsable -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <h3>Contenido del mapa</h3>
-        <p class="subtitle">Trámites y servicios de la administración pública de León, Guanajuato.</p>
+        <div class="sidebar-title-row">
+          <h3>Contenido del mapa</h3>
+          <button id="close-sidebar-btn" class="icon-btn mobile-only" title="Cerrar panel">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+        </div>
+        <p class="subtitle">Trámites y servicios de León, Guanajuato.</p>
       </div>
 
       <div class="filter-box">
@@ -40,19 +50,17 @@
       </div>
     </aside>
 
-    <!-- Map Area -->
+    <!-- Mapa a pantalla completa -->
     <div id="map"></div>
   </div>
 
-  <!-- Drawer / Panel de Información del Lugar -->
+  <!-- Panel de Información del Lugar (Lateral en PC / Inferior en Móvil) -->
   <div class="info-drawer" id="info-drawer">
-    <button class="close-btn" id="close-drawer">&times;</button>
-    <div id="drawer-content">
-      <!-- Se llena al hacer clic en un marcador -->
-    </div>
+    <div class="drawer-handle mobile-only"></div>
+    <button class="close-btn" id="close-drawer" title="Cerrar">&times;</button>
+    <div id="drawer-content"></div>
   </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>

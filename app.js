@@ -1,27 +1,21 @@
-// Coordenadas centrales de León, Guanajuato
 const LEON_CENTER = [21.125, -101.686];
 const ZOOM_LEVEL = 12;
 
-// Inicialización del Mapa
 const map = L.map('map', {
   zoomControl: false
 }).setView(LEON_CENTER, ZOOM_LEVEL);
 
-// Controles en esquina inferior derecha
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Capa Satelital (Esri World Imagery)
-const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri',
   maxZoom: 19
 }).addTo(map);
 
-// Capa de Etiquetas/Nombres de Calles y LUGARES
-const labelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19
 }).addTo(map);
 
-// Datos base de dependencias y servicios de León[cite: 1]
 const pointsOfInterest = [
   { id: 1, name: 'Centro Comunitario (Lomas de la Presa)', category: 'Centro Comunitario', lat: 21.1712, lng: -101.6705, address: 'Lomas de la Presa, León, Gto.', phone: '477 123 4567' },
   { id: 2, name: 'Centro Comunitario (Canteritas de Echeveste)', category: 'Centro Comunitario', lat: 21.1668, lng: -101.6680, address: 'Canteritas de Echeveste, León, Gto.', phone: '477 234 5678' },
@@ -39,18 +33,43 @@ const markersMap = new Map();
 const poiListContainer = document.getElementById('poi-list');
 const infoDrawer = document.getElementById('info-drawer');
 const drawerContent = document.getElementById('drawer-content');
+const backdrop = document.getElementById('mobile-backdrop');
+const globalSearchInput = document.getElementById('global-search');
+const clearSearchBtn = document.getElementById('clear-search-btn');
 
-// Renderizar marcadores y lista lateral
+const isMobile = () => window.innerWidth <= 768;
+
+// Control de apertura/cierre del menú lateral
+function toggleSidebar(forceState) {
+  if (isMobile()) {
+    const shouldOpen = forceState !== undefined ? forceState : !document.body.classList.contains('sidebar-open-mobile');
+    document.body.classList.toggle('sidebar-open-mobile', shouldOpen);
+    backdrop.classList.toggle('active', shouldOpen);
+  } else {
+    const shouldCollapse = forceState !== undefined ? !forceState : !document.body.classList.contains('sidebar-collapsed');
+    document.body.classList.toggle('sidebar-collapsed', shouldCollapse);
+  }
+  setTimeout(() => map.invalidateSize(), 310);
+}
+
+document.getElementById('toggle-sidebar-btn').addEventListener('click', () => toggleSidebar());
+document.getElementById('close-sidebar-btn').addEventListener('click', () => toggleSidebar(false));
+backdrop.addEventListener('click', () => {
+  toggleSidebar(false);
+  infoDrawer.classList.remove('active');
+});
+
 function initPOIs() {
   poiListContainer.innerHTML = '';
   
   pointsOfInterest.forEach(poi => {
-    // Marcador en mapa
     const marker = L.marker([poi.lat, poi.lng]).addTo(map);
-    marker.on('click', () => openDrawer(poi));
+    marker.on('click', () => {
+      map.flyTo([poi.lat, poi.lng], 15);
+      openDrawer(poi);
+    });
     markersMap.set(poi.id, { marker, visible: true, data: poi });
 
-    // Ítem en panel lateral
     const poiDiv = document.createElement('div');
     poiDiv.className = 'poi-item';
     poiDiv.dataset.id = poi.id;
@@ -62,8 +81,8 @@ function initPOIs() {
       <i class="fa-regular fa-eye toggle-eye" title="Mostrar/Ocultar"></i>
     `;
 
-    // Eventos
     poiDiv.querySelector('.poi-info').addEventListener('click', () => {
+      if (isMobile()) toggleSidebar(false);
       map.flyTo([poi.lat, poi.lng], 15);
       openDrawer(poi);
     });
@@ -78,7 +97,6 @@ function initPOIs() {
   });
 }
 
-// Ocultar / Mostrar marcador individual
 function togglePoiVisibility(id, eyeIcon) {
   const item = markersMap.get(id);
   if (!item) return;
@@ -96,7 +114,6 @@ function togglePoiVisibility(id, eyeIcon) {
   }
 }
 
-// Abrir panel informativo
 function openDrawer(poi) {
   drawerContent.innerHTML = `
     <h2 class="drawer-title">${poi.name}</h2>
@@ -109,7 +126,7 @@ function openDrawer(poi) {
     
     <div class="drawer-section">
       <h4>Teléfono de Atención</h4>
-      <p>${poi.phone}</p>
+      <p><a href="tel:${poi.phone.replace(/\s+/g, '')}" style="color:#60a5fa; text-decoration:none;">${poi.phone}</a></p>
     </div>
 
     <div class="drawer-section">
@@ -133,12 +150,25 @@ document.getElementById('layer-search').addEventListener('input', (e) => {
   });
 });
 
-// Buscador general superior
-document.getElementById('global-search').addEventListener('keypress', (e) => {
+// Buscador general superior + botón de limpiar
+globalSearchInput.addEventListener('input', (e) => {
+  clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0);
+});
+
+clearSearchBtn.addEventListener('click', () => {
+  globalSearchInput.value = '';
+  clearSearchBtn.classList.add('hidden');
+  globalSearchInput.focus();
+});
+
+globalSearchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
-    const query = e.target.value.toLowerCase();
-    const match = pointsOfInterest.find(p => p.name.toLowerCase().includes(query));
+    const query = e.target.value.toLowerCase().trim();
+    if (!query) return;
+    const match = pointsOfInterest.find(p => p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
     if (match) {
+      if (isMobile()) toggleSidebar(false);
+      globalSearchInput.blur();
       map.flyTo([match.lat, match.lng], 16);
       openDrawer(match);
     } else {
@@ -147,5 +177,4 @@ document.getElementById('global-search').addEventListener('keypress', (e) => {
   }
 });
 
-// Inicializar al cargar
 initPOIs();
