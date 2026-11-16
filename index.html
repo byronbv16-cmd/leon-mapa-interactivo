@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>León Ciudad Educadora - Visor Satelital</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Search Header Flotante -->
+  <div class="search-bar-container">
+    <div class="search-input-wrapper">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="global-search" placeholder="Buscar en León Ciudad Educadora...">
+    </div>
+  </div>
+
+  <!-- Contenedor Principal -->
+  <div class="main-container">
+    <!-- Sidebar Izquierdo -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Contenido del mapa</h3>
+        <p class="subtitle">Trámites y servicios de la administración pública de León, Guanajuato.</p>
+      </div>
+
+      <div class="filter-box">
+        <input type="text" id="layer-search" placeholder="Filtrar servicios...">
+      </div>
+
+      <div class="poi-list" id="poi-list">
+        <!-- Generado dinámicamente -->
+      </div>
+    </aside>
+
+    <!-- Map Area -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Drawer / Panel de Información del Lugar -->
+  <div class="info-drawer" id="info-drawer">
+    <button class="close-btn" id="close-drawer">&times;</button>
+    <div id="drawer-content">
+      <!-- Se llena al hacer clic en un marcador -->
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
