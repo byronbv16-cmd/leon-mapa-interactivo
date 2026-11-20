@@ -17,7 +17,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/Worl
 }).addTo(map);
 
 // =========================================================================
-// CONFIGURACIÓN DE COLORES POR CATEGORÍA / DEPENDENCIA
+// COLORES POR CATEGORÍA / DEPENDENCIA
 // =========================================================================
 const CATEGORY_COLORS = [
   { keywords: ['presidencia', 'mi barrio habla', 'atención ciudadana', 'ayuntamiento'], color: '#E63946' },
@@ -42,13 +42,72 @@ function getCategoryColor(category, name, description) {
 }
 
 // =========================================================================
-// ESTADO GLOBAL Y CARGA AUTOMÁTICA DE LOS 110 DESTINOS DESDE KML
+// ESTADO GLOBAL Y REFERENCIAS DEL DOM
 // =========================================================================
 let pointsOfInterest = [];
 let activeMarkers = [];
-let selectedCategory = 'ALL';
 let searchTerm = '';
 
+const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+const mobileBackdrop = document.getElementById('mobile-backdrop');
+const globalSearchInput = document.getElementById('global-search');
+const layerSearchInput = document.getElementById('layer-search');
+const clearSearchBtn = document.getElementById('clear-search-btn');
+const poiListEl = document.getElementById('poi-list');
+const infoDrawer = document.getElementById('info-drawer');
+const drawerContent = document.getElementById('drawer-content');
+const closeDrawerBtn = document.getElementById('close-drawer');
+
+// =========================================================================
+// CONTROL DE BARRA LATERAL (COMPUTADORA Y TELÉFONO)
+// =========================================================================
+function isMobileView() {
+  return window.innerWidth <= 768;
+}
+
+function toggleSidebar() {
+  if (isMobileView()) {
+    const isOpen = document.body.classList.toggle('sidebar-open-mobile');
+    if (mobileBackdrop) {
+      mobileBackdrop.classList.toggle('active', isOpen);
+    }
+  } else {
+    document.body.classList.toggle('sidebar-collapsed');
+  }
+}
+
+function closeSidebar() {
+  if (isMobileView()) {
+    document.body.classList.remove('sidebar-open-mobile');
+    if (mobileBackdrop) mobileBackdrop.classList.remove('active');
+  } else {
+    document.body.classList.add('sidebar-collapsed');
+  }
+}
+
+if (toggleSidebarBtn) {
+  toggleSidebarBtn.addEventListener('click', toggleSidebar);
+}
+
+if (closeSidebarBtn) {
+  closeSidebarBtn.addEventListener('click', closeSidebar);
+}
+
+if (mobileBackdrop) {
+  mobileBackdrop.addEventListener('click', closeSidebar);
+}
+
+window.addEventListener('resize', () => {
+  if (!isMobileView()) {
+    document.body.classList.remove('sidebar-open-mobile');
+    if (mobileBackdrop) mobileBackdrop.classList.remove('active');
+  }
+});
+
+// =========================================================================
+// CARGA DE LOS 110 DESTINOS DESDE KML
+// =========================================================================
 async function cargarDestinosDesdeKML() {
   try {
     const response = await fetch('./destinos_leon.kml');
@@ -67,13 +126,11 @@ async function cargarDestinosDesdeKML() {
 
       if (!coordNode) return;
 
-      // KML almacena coordenadas como: longitud,latitud,altitud
       const rawCoords = coordNode.textContent.trim().split(',');
       const lng = parseFloat(rawCoords[0]);
       const lat = parseFloat(rawCoords[1]);
       if (isNaN(lat) || isNaN(lng)) return;
 
-      // Extraer carpeta padre de Google Earth como categoría
       let folderName = 'Servicios Municipales';
       if (pm.parentNode && pm.parentNode.nodeName === 'Folder') {
         const folderNameNode = pm.parentNode.getElementsByTagName('name')[0];
@@ -92,21 +149,19 @@ async function cargarDestinosDesdeKML() {
         category: folderName,
         lat,
         lng,
-        address: 'León, Guanajuato',
         description,
         color
       });
     });
 
     pointsOfInterest = cargados;
-    console.log(`✅ Cargados ${pointsOfInterest.length} destinos desde destinos_leon.kml`);
   } catch (error) {
     console.error('Error al cargar destinos_leon.kml:', error);
   }
 }
 
 // =========================================================================
-// RENDERIZADO DE MARCADORES LIMPIOS EN EL MAPA
+// MARCADORES Y LISTA LATERAL
 // =========================================================================
 function renderMarkers(places) {
   activeMarkers.forEach(item => map.removeLayer(item.marker));
@@ -123,7 +178,6 @@ function renderMarkers(places) {
         border: 2.5px solid #ffffff;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
         cursor: pointer;
-        transition: transform 0.15s ease;
       "></div>`,
       iconSize: [15, 15],
       iconAnchor: [7.5, 7.5]
@@ -139,120 +193,30 @@ function renderMarkers(places) {
     marker.addTo(map);
     activeMarkers.push({ data: place, marker });
   });
-
-  updateCounter(places.length);
-}
-
-// =========================================================================
-// FILTRADO, BÚSQUEDA Y CONTROLES DE INTERFAZ
-// =========================================================================
-function applyFilters() {
-  const query = searchTerm.toLowerCase().trim();
-
-  const filtered = pointsOfInterest.filter(p => {
-    const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
-    const matchesQuery =
-      !query ||
-      p.name.toLowerCase().includes(query) ||
-      p.category.toLowerCase().includes(query) ||
-      p.description.toLowerCase().includes(query);
-    return matchesCategory && matchesQuery;
-  });
-
-  renderMarkers(filtered);
-  renderSidebarList(filtered);
-}
-
-function populateCategoryFilters() {
-  const filterContainer =
-    document.getElementById('category-filters') ||
-    document.getElementById('categoryFilter') ||
-    document.querySelector('.category-filters');
-
-  if (!filterContainer) return;
-
-  const categories = ['ALL', ...new Set(pointsOfInterest.map(p => p.category))];
-
-  if (filterContainer.tagName === 'SELECT') {
-    filterContainer.innerHTML = categories
-      .map(cat => `<option value="${cat}">${cat === 'ALL' ? `Todas las categorías (${pointsOfInterest.length})` : cat}</option>`)
-      .join('');
-    filterContainer.addEventListener('change', e => {
-      selectedCategory = e.target.value;
-      applyFilters();
-    });
-  } else {
-    filterContainer.innerHTML = categories
-      .map(
-        cat => `
-        <button class="filter-btn ${cat === 'ALL' ? 'active' : ''}" data-category="${cat}">
-          ${cat === 'ALL' ? `Todos (${pointsOfInterest.length})` : cat}
-        </button>`
-      )
-      .join('');
-
-    filterContainer.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterContainer.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedCategory = btn.dataset.category;
-        applyFilters();
-      });
-    });
-  }
-}
-
-function setupSearchInput() {
-  const searchInput =
-    document.getElementById('search-input') ||
-    document.getElementById('searchInput') ||
-    document.querySelector('input[type="search"], input[type="text"]');
-
-  if (!searchInput) return;
-
-  searchInput.addEventListener('input', e => {
-    searchTerm = e.target.value;
-    applyFilters();
-  });
-}
-
-function updateCounter(count) {
-  const counterEl =
-    document.getElementById('results-count') ||
-    document.getElementById('total-counter') ||
-    document.getElementById('counter');
-
-  if (counterEl) {
-    counterEl.textContent = `${count} de ${pointsOfInterest.length} destinos`;
-  }
 }
 
 function renderSidebarList(places) {
-  const listEl =
-    document.getElementById('places-list') ||
-    document.getElementById('results-list') ||
-    document.getElementById('poi-list');
+  if (!poiListEl) return;
 
-  if (!listEl) return;
-
-  listEl.innerHTML = places
+  poiListEl.innerHTML = places
     .map(
       place => `
-      <div class="poi-item" data-id="${place.id}" style="cursor:pointer; padding:10px; border-bottom:1px solid rgba(255,255,255,0.1);">
-        <div style="display:flex; align-items:center; gap:8px;">
+      <div class="poi-item" data-id="${place.id}">
+        <div class="poi-info">
           <span style="width:10px; height:10px; border-radius:50%; background:${place.color}; display:inline-block; flex-shrink:0;"></span>
-          <strong>${place.name}</strong>
+          <span title="${place.name}">${place.name}</span>
         </div>
-        <small style="opacity:0.75; display:block; margin-left:18px;">${place.category}</small>
+        <small style="color:#9ca3af; font-size:11px; margin-left:8px; flex-shrink:0;">${place.category}</small>
       </div>`
     )
     .join('');
 
-  listEl.querySelectorAll('.poi-item').forEach(item => {
+  poiListEl.querySelectorAll('.poi-item').forEach(item => {
     item.addEventListener('click', () => {
       const id = Number(item.dataset.id);
       const place = pointsOfInterest.find(p => p.id === id);
       if (place) {
+        if (isMobileView()) closeSidebar();
         map.flyTo([place.lat, place.lng], 16, { duration: 0.8 });
         showPlaceDetails(place);
       }
@@ -261,57 +225,84 @@ function renderSidebarList(places) {
 }
 
 // =========================================================================
-// FICHA INFORMATIVA BAJO DEMANDA AL SELECCIONAR UN DESTINO
+// BÚSQUEDA SINCRONIZADA (BARRA SUPERIOR Y FILTRO LATERAL)
 // =========================================================================
-function showPlaceDetails(place) {
-  const panel =
-    document.getElementById('detail-panel') ||
-    document.getElementById('info-panel') ||
-    document.getElementById('sidebar-detail');
+function handleSearch(value, source) {
+  searchTerm = value;
 
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
+  if (source !== 'global' && globalSearchInput) globalSearchInput.value = value;
+  if (source !== 'layer' && layerSearchInput) layerSearchInput.value = value;
 
-  const detailHTML = `
-    <div style="padding: 16px;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-        <span style="background:${place.color}; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:600;">
-          ${place.category}
-        </span>
-        <button onclick="this.closest('#detail-panel, #info-panel, #sidebar-detail')?.classList.add('hidden')" 
-                style="background:none; border:none; color:inherit; font-size:18px; cursor:pointer;">&times;</button>
-      </div>
-      <h3 style="margin: 10px 0 8px 0; font-size: 1.15rem;">${place.name}</h3>
-      <div style="font-size: 0.9rem; line-height: 1.5; margin-bottom: 14px; max-height: 260px; overflow-y: auto;">
-        ${place.description}
-      </div>
-      <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 14px;">
-        Coordenadas: ${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}
-      </div>
-      <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer"
-         style="display:block; text-align:center; background:#2563eb; color:#fff; padding:10px; border-radius:8px; text-decoration:none; font-weight:600;">
-        Cómo llegar (Google Maps)
-      </a>
-    </div>
-  `;
-
-  if (panel) {
-    panel.classList.remove('hidden');
-    panel.innerHTML = detailHTML;
-  } else {
-    L.popup({ maxWidth: 320 })
-      .setLatLng([place.lat, place.lng])
-      .setContent(detailHTML)
-      .openOn(map);
+  if (clearSearchBtn) {
+    clearSearchBtn.classList.toggle('hidden', value.trim() === '');
   }
+
+  const query = searchTerm.toLowerCase().trim();
+  const filtered = pointsOfInterest.filter(
+    p =>
+      !query ||
+      p.name.toLowerCase().includes(query) ||
+      p.category.toLowerCase().includes(query) ||
+      p.description.toLowerCase().includes(query)
+  );
+
+  renderMarkers(filtered);
+  renderSidebarList(filtered);
+}
+
+if (globalSearchInput) {
+  globalSearchInput.addEventListener('input', e => handleSearch(e.target.value, 'global'));
+}
+
+if (layerSearchInput) {
+  layerSearchInput.addEventListener('input', e => handleSearch(e.target.value, 'layer'));
+}
+
+if (clearSearchBtn) {
+  clearSearchBtn.addEventListener('click', () => {
+    handleSearch('', 'clear');
+  });
 }
 
 // =========================================================================
-// INICIALIZACIÓN PRINCIPAL
+// PANEL DE INFORMACIÓN (#info-drawer)
+// =========================================================================
+function showPlaceDetails(place) {
+  if (!infoDrawer || !drawerContent) return;
+
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
+
+  drawerContent.innerHTML = `
+    <span class="drawer-category" style="background:${place.color};">${place.category}</span>
+    <h2 class="drawer-title">${place.name}</h2>
+    <div class="drawer-section">
+      <h4>Información y trámites</h4>
+      <p>${place.description}</p>
+    </div>
+    <div class="drawer-section">
+      <h4>Coordenadas</h4>
+      <p>${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</p>
+    </div>
+    <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer"
+       style="display:block; text-align:center; background:#2563eb; color:#fff; padding:11px; border-radius:10px; text-decoration:none; font-weight:600; margin-top:16px;">
+      Cómo llegar (Google Maps)
+    </a>
+  `;
+
+  infoDrawer.classList.add('active');
+}
+
+if (closeDrawerBtn && infoDrawer) {
+  closeDrawerBtn.addEventListener('click', () => {
+    infoDrawer.classList.remove('active');
+  });
+}
+
+// =========================================================================
+// INICIALIZACIÓN
 // =========================================================================
 (async function initApp() {
   await cargarDestinosDesdeKML();
-  populateCategoryFilters();
-  setupSearchInput();
   renderMarkers(pointsOfInterest);
   renderSidebarList(pointsOfInterest);
 })();
